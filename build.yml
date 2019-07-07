@@ -38,7 +38,7 @@
     with_items: "{{ ProductionAsgGp.AutoScalingGroups[0].Instances }}" 
   - debug: var=ProductionAsgName
   - debug: var=Productionasginstanceid
-  - name: Gathering varnish instances Public IP 
+  - name: Gathering Production instances Public IP 
     ec2_instance_facts:
         instance_ids:
            - "{{ item }}"
