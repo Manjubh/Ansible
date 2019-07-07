@@ -1,0 +1,160 @@
+---
+- name: USESI Deployment Over Auto-Scaling
+  hosts: 127.0.0.1
+  connection: local
+  gather_facts: False
+  become: yes
+  become_method: sudo
+  
+  vars:
+    Production_private_ip_address: []
+    Production_public_ip_address: []
+    Productionasginstanceid: []
+    ProductionIPs: []
+    Varnish_private_ip_address: []
+    Varnish_public_ip_address: []
+    ProdBGOutput_private_ip_address: []
+    ProdBGOutput_public_ip_address: []
+    AlphaOutput1_private_ip_address: []
+    AlphaOutput1_public_ip_address: []
+    AlphaOutput2_private_ip_address: []
+    AlphaOutput2_public_ip_address: []
+    QAOutput_private_ip_address: []
+    QAOutput_public_ip_address: []
+    Varnishasginstanceid: []
+    varnishIPs: []
+    
+  tasks:
+  - name: Reading  Prod-App-EC2 Details in auto scaling group
+    command: aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name {{ PROD_APP_ASG_NAME }} --region {{ AWS_REGION }}
+    register: ProductionautoscaleOUTPUT
+  - debug: var=ProductionautoscaleOUTPUT
+  - set_fact:
+      ProductionAsgGp: "{{  ProductionautoscaleOUTPUT.stdout | from_json }} "
+  - set_fact: 
+      ProductionAsgName: "{{ ProductionAsgGp.AutoScalingGroups[0].AutoScalingGroupName }}"
+  - set_fact:
+       Productionasginstanceid: "{{ Productionasginstanceid }} + [ '{{item.InstanceId}}' ]"
+    with_items: "{{ ProductionAsgGp.AutoScalingGroups[0].Instances }}" 
+  - debug: var=ProductionAsgName
+  - debug: var=Productionasginstanceid
+  - name: Gathering varnish instances Public IP 
+    ec2_instance_facts:
+        instance_ids:
+           - "{{ item }}"
+    with_items: 
+       -  "{{ Productionasginstanceid }}"
+    register: ProductioninstancesIP
+  - debug: var=ProductioninstancesIP
+  - set_fact:
+      ProductionIPs: "{{ ProductionIPs }} + [ '{{item.instances[0].network_interfaces[0].association.public_ip }}' ]"
+    with_items: "{{ varnishinstancesIP.results }}"
+    
+  - set_fact:
+         Production_private_ip_address: "{{ Production_private_ip_address }} + [ '{{item.instances[0].network_interfaces[0].private_ip_address}}' ]"
+    with_items: "{{ ProductioninstancesIP.results }}"
+  - debug: var=Production_private_ip_address 
+  - debug: var=ProductionIPs
+     
+  - name: Reading varnish instances in auto scaling group  
+    command: aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name {{ VARNISH_ASG_NAME }} --region {{ AWS_REGION }}
+    register: VarnishautoscaleOUTPUT
+  - debug: var=VarnishautoscaleOUTPUT
+  - set_fact:
+      VarnishAsgGp: "{{ VarnishautoscaleOUTPUT.stdout | from_json }} "
+  - set_fact: 
+      VarnishAsgName: "{{ VarnishAsgGp.AutoScalingGroups[0].AutoScalingGroupName }}"
+  - set_fact:
+       Varnishasginstanceid: "{{ Varnishasginstanceid }} + [ '{{item.InstanceId}}' ]"
+    with_items: "{{ VarnishAsgGp.AutoScalingGroups[0].Instances }}" 
+  - debug: var=VarnishAsgName
+  - debug: var=Varnishasginstanceid
+
+  - name: Gathering varnish instances Public IP 
+    ec2_instance_facts:
+        instance_ids:
+           - "{{ item }}"
+    with_items: 
+       -  "{{ Varnishasginstanceid }}"
+    register: varnishinstancesIP
+  - debug: var=varnishinstancesIP
+  - set_fact:
+      varnishIPs: "{{ varnishIPs }} + [ '{{item.instances[0].network_interfaces[0].association.public_ip }}' ]"
+    with_items: "{{ varnishinstancesIP.results }}"
+    
+  - set_fact:
+         Varnish_private_ip_address: "{{ Varnish_private_ip_address }} + [ '{{item.instances[0].network_interfaces[0].private_ip_address}}' ]"
+    with_items: "{{ varnishinstancesIP.results }}"
+  - debug: var=Varnish_private_ip_address 
+  - debug: var=varnishIPs
+    
+  - name: Gather existing Prod-BG frontend EC2 Details
+    ec2_instance_facts:
+      filters:
+        instance-state-name: running
+        "tag:Name": "{{ PROD_BG }}"
+      region:   "{{ AWS_REGION }}"
+    register: ProdBGOutput
+  #- debug: var=ProdBGOutput
+  - set_fact:
+       ProdBGOutput_private_ip_address: "{{ ProdBGOutput_private_ip_address }} + [ '{{item}}' ]"
+    with_items: "{{ ProdBGOutput.instances[0].private_ip_address }}"
+  - set_fact:
+       ProdBGOutput_public_ip_address: "{{ ProdBGOutput_public_ip_address }} + [ '{{item}}' ]"
+    with_items: "{{ ProdBGOutput.instances[0].public_ip_address }}"
+    
+  - debug: var=ProdBGOutput_private_ip_address
+  - debug: var=ProdBGOutput_public_ip_address
+  
+  - name: Gather existing Alpha1 EC2 Details
+    ec2_instance_facts:
+      filters:
+        instance-state-name: running
+        "tag:Name": "{{ ALPHA1 }}"
+      region: "{{ AWS_REGION }}"
+    register: AlphaOutput
+  #- debug: var=AlphaOutput
+  - set_fact:
+       AlphaOutput1_private_ip_address: "{{ AlphaOutput1_private_ip_address }} + [ '{{item}}' ]"
+    with_items: "{{ AlphaOutput.instances[0].private_ip_address }}"
+  - set_fact:
+       AlphaOutput1_public_ip_address: "{{ AlphaOutput1_public_ip_address }} + [ '{{item}}' ]"
+    with_items: "{{ AlphaOutput.instances[0].public_ip_address }}"
+  - debug: var=AlphaOutput1_private_ip_address
+  - debug: var=AlphaOutput1_public_ip_address
+ 
+ 
+  - name: Gather existing Alpha2 EC2 Details  
+    ec2_instance_facts:
+      filters:
+        instance-state-name: running
+        "tag:Name": "{{ ALPHA2 }}"
+      region: "{{ AWS_REGION }}"
+    register: AlphaOutput2
+  #- debug: var=AlphaOutput2
+  - set_fact:
+       AlphaOutput2_private_ip_address: "{{ AlphaOutput2_private_ip_address }} + [ '{{item}}' ]"
+    with_items: "{{ AlphaOutput2.instances[0].private_ip_address }}"
+  - set_fact:
+       AlphaOutput2_public_ip_address: "{{ AlphaOutput2_public_ip_address }} + [ '{{item}}' ]"
+    with_items: "{{ AlphaOutput2.instances[0].public_ip_address }}"
+  - debug: var=AlphaOutput2_private_ip_address
+  - debug: var=AlphaOutput2_public_ip_address
+ 
+ 
+  - name: Gather existing QA EC2 Details
+    ec2_instance_facts:
+      filters:
+        instance-state-name: running
+        "tag:Name": "{{ MAGENTO_QA }}"
+      region:   "{{ AWS_REGION }}"
+    register: QAOutput
+  #- debug: var=QAOutput
+  - set_fact:
+       QAOutput_private_ip_address: "{{ QAOutput_private_ip_address }} + [ '{{item}}' ]"
+    with_items: "{{ QAOutput.instances[0].private_ip_address }}"
+  - set_fact:
+       QAOutput_public_ip_address: "{{ QAOutput_public_ip_address }} + [ '{{item}}' ]"
+    with_items: "{{ QAOutput.instances[0].public_ip_address }}"
+  - debug: var=QAOutput_private_ip_address
+  - debug: var=QAOutput_public_ip_address
