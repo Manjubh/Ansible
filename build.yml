@@ -48,7 +48,7 @@
   - debug: var=ProductioninstancesIP
   - set_fact:
       ProductionIPs: "{{ ProductionIPs }} + [ '{{item.instances[0].network_interfaces[0].association.public_ip }}' ]"
-    with_items: "{{ varnishinstancesIP.results }}"
+    with_items: "{{ ProductioninstancesIP.results }}"
     
   - set_fact:
          Production_private_ip_address: "{{ Production_private_ip_address }} + [ '{{item.instances[0].network_interfaces[0].private_ip_address}}' ]"
