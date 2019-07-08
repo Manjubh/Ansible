@@ -8,7 +8,6 @@
   
   vars:
     Production_private_ip_address: []
-    Production_public_ip_address: []
     Productionasginstanceid: []
     ProductionIPs: []
     Varnish_private_ip_address: []
