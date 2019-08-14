@@ -1,0 +1,50 @@
+---
+- name: BrowserStack Smoke Test Suite
+  hosts: 127.0.0.1
+  connection: local
+  become: yes
+  
+  tasks:
+  
+  - name: Get build number
+    set_fact:
+      build: "{{ lookup('env', 'BUILD_NUMBER') }}"
+
+  - name: Get Jenkins job name
+    set_fact:
+      jobname: "{{ lookup('env', 'JOB_NAME') }}"
+
+  - name: Fetch month and year
+    set_fact:
+      dir: "{{ lookup('pipe', 'date -u +%b-%Y') }}"
+
+  - name: Fetch datetime
+    set_fact:
+      subdir: "{{ lookup('pipe', 'date +%F_%T%Z') }}"
+
+  - name: Ensure directory path exists
+    file:
+      state: directory
+      path: /var/www/html/hawksearch/{{ dir }}/
+      owner: www-data
+      group: www-data
+      mode: 0775
+
+  - name: Copy the test-output to the destination
+    command: cp -r /var/lib/jenkins/workspace/{{ jobname }}/selenium/test-output /var/www/html/hawksearch/{{ dir }}/{{ subdir }}
+
+  - name: Set Ownership and File Permissions
+    command: "{{item}}"
+    with_items:
+      - chown -R www-data:www-data /var/www/html/hawksearch/{{ dir }}/{{ subdir }}
+      - chmod -R 775 /var/www/html/hawksearch/{{ dir }}/{{ subdir }}
+
+  - name: Fetch the consolidated output
+    shell: awk '/PASSED/ || /FAILED/' /var/lib/jenkins/jobs/{{ jobname }}/builds/{{ build }}/log
+    register: output_msg
+    
+  - name: Send Slack Notification
+    slack:
+      token: "{{ SLACK_TOKEN }}"
+      channel: "{{ SLACK_CHANNEL }}"
+      msg: "{{ output_msg.stdout }}\n\n"
