@@ -7,11 +7,12 @@
   become_method: sudo
    
  tasks:
-    - name: trigger jenkins job
-      uri:
-      url: http://{{ jenkins.host }}/job/{{ jenkins.job }}/build?token={{ jenkins.token }}
-      user: "{{ jenkins.user }}"
-      password: "{{ jenkins.password }}"
-      method: POST
-      force_basic_auth: yes
-      status_code: 201
+    
+- name: Queue build of a project in Jenkins
+  uri:
+    url: "http://{{ jenkins.host }}/job/{{ jenkins.job }}/build?token={{ jenkins.token }}"
+    method: POST
+    user: "{{ jenkins.user }}"
+    password: "{{ jenkins.password }}"
+    force_basic_auth: yes
+    status_code: 201
